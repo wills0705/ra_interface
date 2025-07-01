@@ -1,14 +1,15 @@
-// Import Firebase SDK functions
+// firebase.js
 import { initializeApp } from 'firebase/app';
 import { getAnalytics } from 'firebase/analytics';
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentSingleTabManager
+} from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
+import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 
-// Import additional services you plan to use
-import { getFirestore } from 'firebase/firestore'; // For Firestore
-import { getDatabase } from 'firebase/database';   // For Realtime Database
-import { getAuth } from 'firebase/auth';           // For Authentication
-import { getStorage } from 'firebase/storage';     // For Storage
-
-// Your Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyBdLhjpaeKi0vlGwEm2nEWYv3SnD-jtjYg",
   authDomain: "moodtrac-65e32.firebaseapp.com",
@@ -20,15 +21,18 @@ const firebaseConfig = {
   measurementId: "G-Y6Z7BJ90HY"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
-// Initialize Firebase services
-const db = getFirestore(app);        // Firestore
-const realtimedb = getDatabase(app); // Realtime Database
-const auth = getAuth(app);           // Authentication
-const storage = getStorage(app);     // Storage
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentSingleTabManager()
+  }),
+  experimentalForceLongPolling: true
+});
 
-// Export the initialized services
+const realtimedb = getDatabase(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
+
 export { app, analytics, db, realtimedb, auth, storage };
