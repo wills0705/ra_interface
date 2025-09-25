@@ -19,6 +19,6 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['ra-interface.onrender.com']
+    allowedHosts: ['ra-interface-24a6.onrender.com']
   }
 })
