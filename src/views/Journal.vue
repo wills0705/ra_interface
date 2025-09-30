@@ -33,7 +33,8 @@
           <div class="content-container-content">
             {{ currentJournal.content }}
           </div>
-          <!-- Approve button (only shows if NOT approved) -->
+          
+          <!-- Approve button -->
           <button
             v-if="currentJournal.isApproved === false"
             @click.stop="approveJournal(currentJournal)"
@@ -41,9 +42,23 @@
             Approve
           </button>
           <!-- If it is already approved, show some indicator -->
-          <div v-else>
-            <strong>Journal is approved!</strong>
+          <div v-if="currentJournal.isApproved === true">
+            <strong>Image is approved!</strong>
           </div>
+
+
+          <!-- Reject button -->
+          <button
+            v-if="currentJournal.isApproved === false"
+            @click.stop="rejectJournal(currentJournal)"
+          >
+            Reject
+          </button>
+          <!-- If it is already rejected, show some indicator -->
+          <div v-if="currentJournal.isApproved !== false && currentJournal.isApproved !== true">
+            <strong>Image is rejected!</strong>
+          </div>
+
         </div>
       </div>
 
@@ -114,44 +129,34 @@ export default {
         };
       });
     },
-    getWeekDay(date) {
-      const d = new Date(date);
-      return dayMap[d.getDay()];
+    getWeekDay(ymd) {
+      // ymd: "YYYY-MM-DD" → parse as local date
+      const [y, m, d] = String(ymd).split('-').map(Number);
+      const dt = new Date(y, m - 1, d); // local
+      return dayMap[dt.getDay()];
     },
-    formatEnDate(date) {
-      const d = new Date(date);
-      const m = monthMap[d.getMonth()].slice(0, 3);
-      const dd = d.getDate();
-      const y = d.getFullYear();
-      return `${m}.${dd}.${y}`;
+    formatEnDate(ymd) {
+      const [y, m, d] = String(ymd).split('-').map(Number);
+      const dt = new Date(y, m - 1, d); // local
+      const mon = monthMap[dt.getMonth()].slice(0, 3);
+      const dd = String(dt.getDate()).padStart(2, '0');
+      return `${mon}.${dd}.${y}`;
     },
     async approveJournal(journal) {
-      try {
-        console.log('journal id:', journal.id);
-        
-        const docRef = doc(db, 'journalList', journal.id);
-        console.log('file creation success:', docRef.path);
-        
-        await updateDoc(docRef, { isApproved: true });
-        console.log('database update success');
-        
-        const updatedJournal = { ...journal, isApproved: true };
-        console.log('target journal:', updatedJournal);
-        
+      try {        
+        const docRef = doc(db, 'journalList', journal.id);        
+        await updateDoc(docRef, { isApproved: true });        
+        const updatedJournal = { ...journal, isApproved: true };        
         this.list = this.list.map(item =>
           item.id === journal.id 
             ? { ...item, isApproved: true } 
             : item
         )
-
         if (this.currentJournal.id === journal.id) {
           this.currentJournal.isApproved = true
-        }
-        console.log('new list:', this.journalList);
-        
+        }        
         if (this.currentJournal.id === journal.id) {
           this.currentJournal = { ...updatedJournal };
-          console.log('update success:', this.currentJournal);
         }
         
         this.$message.success('Journal is approved');
@@ -159,6 +164,30 @@ export default {
         console.error('whole error message:', err);
         console.error('error stack:', err.stack);
         this.$message.error('approve failed: ' + err.message);
+      } 
+    },
+    async rejectJournal(journal) {
+      try {        
+        const docRef = doc(db, 'journalList', journal.id);        
+        await updateDoc(docRef, { isApproved: "reject" });        
+        const updatedJournal = { ...journal, isApproved: "reject" };        
+        this.list = this.list.map(item =>
+          item.id === journal.id 
+            ? { ...item, isApproved: "reject" } 
+            : item
+        )
+        if (this.currentJournal.id === journal.id) {
+          this.currentJournal.isApproved = "reject"
+        }        
+        if (this.currentJournal.id === journal.id) {
+          this.currentJournal = { ...updatedJournal };
+        }
+        
+        this.$message.success('Journal is rejected');
+      } catch (err) {
+        console.error('whole error message:', err);
+        console.error('error stack:', err.stack);
+        this.$message.error('reject failed: ' + err.message);
       } 
     }
   },
