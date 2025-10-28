@@ -3,18 +3,19 @@
     <div class="mood-journal-app-content">
       <div class="app-container">
         <div class="mood-journal-app-content-header">
-          <div :class="['tab-item', activeIndex === index ? 'active-item' : '']" 
-               v-for="(item, index) in tabList"
-               :key="index" 
-               @click="handleClick(index)">
+          <div
+            :class="['tab-item', activeIndex === index ? 'active-item' : '']"
+            v-for="(item, index) in tabList"
+            :key="index"
+            @click="handleClick(index)"
+          >
             {{ item.name }}
           </div>
         </div>
+
         <div class="mood-journal-app-content-content">
           <keep-alive>
-            <component :is="currentComponent" 
-                       :journalList="journalList">
-            </component>
+            <component :is="currentComponent" :journalList="journalList" />
           </keep-alive>
         </div>
       </div>
@@ -23,35 +24,34 @@
 </template>
 
 <script>
-import Journal from './views/Journal'; 
+import Journal from './views/Journal';
 
 import { db } from './firebase';
 import {
   collection,
-  getDocs,
   query,
   orderBy,
+  onSnapshot, // <-- real-time listener
 } from 'firebase/firestore';
 
 export default {
-  components: {
-    Journal, 
-  },
+  components: { Journal },
   data() {
     return {
       journalList: [],
       tabList: [
-        {
-          name: 'Journal Entries', 
-          componentName: 'journal',
-        }
+        { name: 'Journal Entries', componentName: 'journal' }
       ],
-      activeIndex: 0, 
-      currentComponent: 'journal', 
+      activeIndex: 0,
+      currentComponent: 'journal',
+      _unsubJournals: null, // <- store unsubscribe
     };
   },
   created() {
-    this.fetchJournalList();
+    this.startJournalStream();
+  },
+  beforeUnmount() {
+    this.stopJournalStream();
   },
   methods: {
     handleClick(index) {
@@ -59,21 +59,39 @@ export default {
       this.currentComponent = this.tabList[index].componentName;
     },
 
-    async fetchJournalList() {
-      try {
-        const q = query(
-          collection(db, 'journalList'),
-          orderBy('timestamp', 'desc')
-        );
-        const querySnapshot = await getDocs(q);
-        this.journalList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          sdImage: doc.data().sdImage || '' 
-        }));
-      } catch (error) {
-        console.error('Error fetching journalList:', error);
-        this.journalList = [];
+    // ----- Real-time stream -----
+    startJournalStream() {
+      // Order by timestamp descending; stream updates in real time
+      const q = query(
+        collection(db, 'journalList'),
+        orderBy('timestamp', 'desc')
+      );
+
+      // If you want to hide local pending writes in RA, set includeMetadataChanges:true
+      this._unsubJournals = onSnapshot(
+        q,
+        (snapshot) => {
+          // Optionally ignore local pending writes:
+          // const docs = snapshot.docs.filter(d => !d.metadata.hasPendingWrites);
+          const docs = snapshot.docs;
+
+          this.journalList = docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+            sdImage: doc.data().sdImage || ''
+          }));
+        },
+        (err) => {
+          console.error('RA journal stream error:', err);
+          this.journalList = [];
+        }
+      );
+    },
+
+    stopJournalStream() {
+      if (this._unsubJournals) {
+        this._unsubJournals();
+        this._unsubJournals = null;
       }
     },
   },
