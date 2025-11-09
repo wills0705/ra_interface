@@ -13,6 +13,12 @@
             {{ item.name }}
           </div>
 
+          <!-- NEW: enable sound + hidden audio element -->
+          <button class="sound" @click="primeSound">
+            {{ soundEnabled ? 'Sound: On 🔊' : 'Enable Sound 🔔' }}
+          </button>
+          <audio ref="ding" preload="auto" src="/sounds/notify.wav"></audio>
+
           <button class="logout" @click="logout">Log Out</button>
         </div>
 
@@ -36,12 +42,7 @@ import Journal from './views/Journal';
 import RaLogin from './components/RaLogin.vue';
 
 import { auth, db } from './firebase';
-import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot
-} from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 export default {
@@ -56,6 +57,10 @@ export default {
       activeIndex: 0,
       currentComponent: 'journal',
       _unsubJournals: null,
+
+      soundEnabled: false,
+      _initializedStream: false,
+      _seenIds: new Set(),
     };
   },
 
@@ -69,6 +74,8 @@ export default {
       } else {
         this.stopJournalStream();
         this.journalList = [];
+        this._seenIds.clear();
+        this._initializedStream = false;
       }
     });
   },
@@ -91,24 +98,60 @@ export default {
       }
     },
 
-    // ---- Real-time Firestore stream for RA ----
-    startJournalStream() {
-      // Stream all entries ordered by newest; RA sees updates live.
-      const q = query(
-        collection(db, 'journalList'),
-        orderBy('timestamp', 'desc')
-      );
+    primeSound() {
+      if (this.soundEnabled) return;
+      const el = this.$refs.ding;
+      if (!el) return;
+      const v = el.volume;
+      el.volume = 0.0;
+      el.play().catch(() => {});
+      setTimeout(() => { el.pause(); el.currentTime = 0; el.volume = v; }, 60);
+      this.soundEnabled = true;
+    },
+    playDing() {
+      if (!this.soundEnabled) return;
+      const el = this.$refs.ding;
+      if (el) {
+        el.currentTime = 0;
+        el.play().catch(() => {});
+      }
+    },
+    needsReview(data) {
+      const imageNeeds   = data?.isApproved === false;
+      const therapyNeeds = !!data?.therapy && data?.therapyApproved === false;
+      return imageNeeds || therapyNeeds;
+    },
 
-      // optional: includeMetadataChanges:true to filter pending writes if needed
+    startJournalStream() {
+      const q = query(collection(db, 'journalList'), orderBy('timestamp', 'desc'));
+
       this._unsubJournals = onSnapshot(
         q,
         (snapshot) => {
-          const docs = snapshot.docs;
-          this.journalList = docs.map((doc) => ({
+          // refresh UI list
+          this.journalList = snapshot.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
             sdImage: doc.data().sdImage || ''
           }));
+
+          snapshot.docChanges().forEach((chg) => {
+            const id = chg.doc.id;
+            const data = chg.doc.data();
+
+            if (chg.type === 'added') {
+              if (!this._initializedStream) {
+                this._seenIds.add(id);
+                return;
+              }
+              if (!this._seenIds.has(id) && this.needsReview(data)) {
+                this.playDing();
+              }
+              this._seenIds.add(id);
+            }
+          });
+
+          this._initializedStream = true;
         },
         (err) => {
           console.error('RA journal stream error:', err);
@@ -170,8 +213,19 @@ export default {
         background-color: #99CC99;
       }
 
-      .logout {
+      .sound {
         margin-left: auto;
+        padding: 6px 12px;
+        border: none;
+        border-radius: 8px;
+        background: #2563eb;
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .logout {
+        margin-left: 8px;
         padding: 6px 14px;
         border: none;
         border-radius: 8px;

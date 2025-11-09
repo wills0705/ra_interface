@@ -24,7 +24,7 @@
               {{ currentJournal.enDate.slice(-4) }}, {{ currentJournal.weekDay }}
             </div>
           </div>
-          
+
           <div class="content-title-meta">
             <span class="email" :title="currentJournal.userEmail || 'unknown'">
               {{ currentJournal.userEmail || 'unknown' }}
@@ -40,14 +40,20 @@
           <div class="review-block">
             <div class="review-title">AI Image Review</div>
 
-            <div class="review-actions" v-if="currentJournal.isApproved === false">
-              <button @click.stop="approveJournal(currentJournal)">Approve image</button>
-              <button class="danger" @click.stop="rejectJournal(currentJournal)">Reject image</button>
-            </div>
+            <!-- If HAS image: show review UI/status -->
+            <template v-if="hasImage">
+              <div class="review-actions" v-if="currentJournal.isApproved === false">
+                <button @click.stop="approveJournal(currentJournal)">Approve image</button>
+                <button class="danger" @click.stop="rejectJournal(currentJournal)">Reject image</button>
+              </div>
 
-            <div v-if="currentJournal.isApproved === true" class="status ok">✓ Image is approved</div>
-            <div v-else-if="currentJournal.isApproved === 'reject'" class="status reject">✗ Image is rejected</div>
-            <div v-else class="status pending">• Pending decision</div>
+              <div v-if="currentJournal.isApproved === true" class="status ok">✓ Image is approved</div>
+              <div v-else-if="currentJournal.isApproved === 'reject'" class="status reject">✗ Image is rejected</div>
+              <div v-else class="status pending">• Pending decision</div>
+            </template>
+
+            <!-- If NO image: show placeholder text -->
+            <div v-else class="img-empty">No image yet.</div>
           </div>
 
           <hr class="sep" />
@@ -85,8 +91,14 @@
       <!-- ===== Right: image preview ===== -->
       <div class="journal-list-content-right">
         <div class="content-img">
-          <img :src="currentJournal.sdImage || fallbackCat" alt="Generated Image" class="ai-img" />
-          <div class="img-text">AI-Generated Image</div>
+          <!-- Only show image when it exists -->
+          <template v-if="hasImage">
+            <img :src="currentJournal.sdImage" alt="Generated Image" class="ai-img" />
+            <div class="img-text">AI–Generated Image</div>
+          </template>
+          <template v-else>
+            <div class="img-empty">No image yet.</div>
+          </template>
         </div>
       </div>
     </div>
@@ -123,6 +135,11 @@ export default {
       },
       fallbackCat: ''
     };
+  },
+  computed: {
+    hasImage() {
+      return !!(this.currentJournal && this.currentJournal.sdImage);
+    }
   },
   watch: {
     journalList() {
@@ -290,6 +307,9 @@ export default {
         border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         padding: 10px;
 
+        &-text .month { font-size: 24px; font-weight: bold; }
+        &-text .week { margin-top: 4px; }
+
         &-meta .email {
           max-width: 260px;
           display: inline-block;
@@ -348,6 +368,7 @@ export default {
         overflow: auto;
       }
       .therapy-empty { color: #888; font-style: italic; }
+      .img-empty { color: #888; font-style: italic; }
     }
 
     &-right {
