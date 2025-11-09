@@ -1,16 +1,19 @@
 <template>
   <div class="mood-journal-app">
     <div class="mood-journal-app-content">
-      <div class="app-container">
+      <!-- When authenticated (and allowed via RaLogin.vue), show RA UI -->
+      <div v-if="isAuthenticated" class="app-container">
         <div class="mood-journal-app-content-header">
           <div
-            :class="['tab-item', activeIndex === index ? 'active-item' : '']"
             v-for="(item, index) in tabList"
             :key="index"
+            :class="['tab-item', activeIndex === index ? 'active-item' : '']"
             @click="handleClick(index)"
           >
             {{ item.name }}
           </div>
+
+          <button class="logout" @click="logout">Log Out</button>
         </div>
 
         <div class="mood-journal-app-content-content">
@@ -19,62 +22,88 @@
           </keep-alive>
         </div>
       </div>
+
+      <!-- Not signed in → show RA login screen -->
+      <div v-else class="login-container">
+        <RaLogin />
+      </div>
     </div>
   </div>
 </template>
 
 <script>
 import Journal from './views/Journal';
+import RaLogin from './components/RaLogin.vue';
 
-import { db } from './firebase';
+import { auth, db } from './firebase';
 import {
   collection,
   query,
   orderBy,
-  onSnapshot, // <-- real-time listener
+  onSnapshot
 } from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 export default {
-  components: { Journal },
+  name: 'App',
+  components: { Journal, RaLogin },
+
   data() {
     return {
+      isAuthenticated: false,
       journalList: [],
-      tabList: [
-        { name: 'Journal Entries', componentName: 'journal' }
-      ],
+      tabList: [{ name: 'Journal Entries', componentName: 'journal' }],
       activeIndex: 0,
       currentComponent: 'journal',
-      _unsubJournals: null, // <- store unsubscribe
+      _unsubJournals: null,
     };
   },
+
   created() {
-    this.startJournalStream();
+    // Gate whole app on Firebase auth state; RaLogin enforces allow-list.
+    onAuthStateChanged(auth, (user) => {
+      this.isAuthenticated = !!user;
+
+      if (this.isAuthenticated) {
+        this.startJournalStream();
+      } else {
+        this.stopJournalStream();
+        this.journalList = [];
+      }
+    });
   },
+
   beforeUnmount() {
     this.stopJournalStream();
   },
+
   methods: {
     handleClick(index) {
       this.activeIndex = index;
       this.currentComponent = this.tabList[index].componentName;
     },
 
-    // ----- Real-time stream -----
+    async logout() {
+      try {
+        await signOut(auth);
+      } catch (e) {
+        console.error('Sign out failed:', e);
+      }
+    },
+
+    // ---- Real-time Firestore stream for RA ----
     startJournalStream() {
-      // Order by timestamp descending; stream updates in real time
+      // Stream all entries ordered by newest; RA sees updates live.
       const q = query(
         collection(db, 'journalList'),
         orderBy('timestamp', 'desc')
       );
 
-      // If you want to hide local pending writes in RA, set includeMetadataChanges:true
+      // optional: includeMetadataChanges:true to filter pending writes if needed
       this._unsubJournals = onSnapshot(
         q,
         (snapshot) => {
-          // Optionally ignore local pending writes:
-          // const docs = snapshot.docs.filter(d => !d.metadata.hasPendingWrites);
           const docs = snapshot.docs;
-
           this.journalList = docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
@@ -124,12 +153,14 @@ export default {
       display: flex;
       align-items: center;
       justify-content: flex-start;
+      gap: 8px;
 
       .tab-item {
         padding: 4px 20px;
         border-radius: 12px;
         transition: font-size 0.1s ease;
         cursor: pointer;
+        user-select: none;
       }
 
       .active-item {
@@ -137,6 +168,17 @@ export default {
         font-weight: bold;
         color: green;
         background-color: #99CC99;
+      }
+
+      .logout {
+        margin-left: auto;
+        padding: 6px 14px;
+        border: none;
+        border-radius: 8px;
+        background: #ef4444;
+        color: #fff;
+        font-weight: 700;
+        cursor: pointer;
       }
     }
 
@@ -146,5 +188,12 @@ export default {
       margin-top: 20px;
     }
   }
+}
+
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 </style>

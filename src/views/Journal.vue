@@ -24,6 +24,12 @@
               {{ currentJournal.enDate.slice(-4) }}, {{ currentJournal.weekDay }}
             </div>
           </div>
+          
+          <div class="content-title-meta">
+            <span class="email" :title="currentJournal.userEmail || 'unknown'">
+              {{ currentJournal.userEmail || 'unknown' }}
+            </span>
+          </div>
         </div>
 
         <div class="content-container">
@@ -110,6 +116,7 @@ export default {
         currentDate: '',
         timestamp: '',
         sdImage: '',
+        userEmail: '',
         isApproved: false,        // image review state
         therapy: '',
         therapyApproved: false    // therapy review state
@@ -283,9 +290,18 @@ export default {
         border-bottom: 1px solid rgba(0, 0, 0, 0.1);
         padding: 10px;
 
-        &-text {
-          .month { font-size: 24px; font-weight: bold; }
-          .week { margin-top: 4px; }
+        &-meta .email {
+          max-width: 260px;
+          display: inline-block;
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: #eef2ff;
+          color: #334155;
+          font-size: 15px;
+          font-weight: 600;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
       }
 
