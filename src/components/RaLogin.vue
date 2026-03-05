@@ -27,6 +27,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 const ALLOW_RA = [
   'test@test.com',
   'govlekdp@gmail.com',
+  'engineer.reza84@gmail.com',
 ];
 
 export default {
