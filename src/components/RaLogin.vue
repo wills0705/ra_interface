@@ -28,6 +28,7 @@ const ALLOW_RA = [
   'test@test.com',
   'govlekdp@gmail.com',
   'engineer.reza84@gmail.com',
+  'swati@gmail.com',
 ];
 
 export default {
